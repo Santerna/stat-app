@@ -1,39 +1,61 @@
-import { parseFormData } from "../../utils/parseFormData";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import axios from "axios";
 import { BarChart } from "@mui/x-charts/BarChart";
-import axios, { AxiosResponse } from "axios";
+import { Container, Typography } from "@mui/material";
 import { FormInput, ResponseData } from "../../utils/types";
-
+import { getQuarters, parseFormData } from "../../utils/parseFormData";
 
 type ChartProps = {
     props: FormInput,
 }
 
+const chartSettings = {
+    height: 300,
+    margin: {bottom: 50, left: 70, right: 20, top: 20},
+    skipAnimation: true
+}
+
 export const Chart: React.FC<ChartProps> = (props) => {
     const baseUrl = process.env.BASE_URL as string;
     const [chartData, setChartData] = useState<ResponseData>({} as ResponseData);
-    const query = useMemo(() => parseFormData(props), [props]);
 
-    useEffect(() => {
-        localStorage.setItem('dataKey', JSON.stringify(baseUrl+query));
-        axios.post<AxiosResponse>(baseUrl, query, {
+    const query = parseFormData(props);
+
+    const getData = useCallback(() => {
+        axios.post<ResponseData>(baseUrl, query, {
             headers: {
                 "Content-Type": "application/json"
             }
         }).then(response => {
-            const { data } = response.data;
-            setChartData(data)
+            setChartData(response.data);
         }).catch(error => console.error(error))
-    }, [query])
+    }, []);
 
-    const axis = Object.keys(chartData.dimension?.Tid?.category?.label) ?? ["2009K1", "2024K2"];
+    useEffect(() => {
+        localStorage.setItem('dataKey', JSON.stringify(baseUrl+query));
+        getData();
+    }, [query]);
+
+    const value = chartData.value;
+    const quarters = getQuarters(props.props.startDateValue!, props.props.endDateValue!);
+
+    if (value === undefined) {
+        return (
+        <Typography variant="h5" padding={3}> 
+            Still loading...
+        </Typography>)
+    }
 
     return (
-        <BarChart
-            xAxis={[{ scaleType: "band", data: axis }]}
-            series={[{ data: [4, 3, 5] }, { data: [1, 6, 3] }, { data: [2, 5, 6] }]}
-            width={500}
-            height={300}
-        />
+        <Container maxWidth={false}>
+            <Typography variant="h5" padding={3}> 
+                Prices for {props.props.startDateValue?.year()}-{props.props.endDateValue?.year()} Period (NOK)
+            </Typography>
+            <BarChart
+                xAxis={[{ scaleType: "band", data: quarters }]}
+                series={[{ data: value }]}
+                {...chartSettings}
+            />
+        </Container>
     )
 }
